@@ -13,7 +13,7 @@
 - 覆盖日志轮转、备份数量、文件大小和打开日志失败。
 - `cmake --install` 后，由独立的消费工程使用 `find_package` 和 `gamepad::input` 成功构建并运行。
 - 单独编译 `generic_xinput` 型号目标并运行，成功退出。非法槽位参数会拒绝启动。
-- 已配置 Windows/MSVC 与 Linux 共用核心 ASan/UBSan 的 CI；本机没有运行 MSVC 或 Linux，也不将 CI 配置等同于已通过。
+- GitHub Actions 的 Windows/MSVC 构建测试及 Linux 共用核心 ASan/UBSan 构建测试均实际通过：[CI 运行记录](https://github.com/g2uzi2018-stack/gamepad-input-bridge/actions/runs/39359748602)。Linux 测试使用模拟后端，不代表原生 Linux 手柄读取已实现。
 
 ## 正式 C++ 示例实机采样
 
