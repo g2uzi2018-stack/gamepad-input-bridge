@@ -1,0 +1,15 @@
+# Local settings and secrets
+.env
+.env.*
+!.env.example
+
+# Generated files and scratch work
+*.log
+*.tmp
+*.bak
+work/
+
+# Operating system files
+.DS_Store
+Thumbs.db
+Desktop.ini
