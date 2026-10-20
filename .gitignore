@@ -8,6 +8,12 @@
 *.tmp
 *.bak
 work/
+build/
+build-*/
+install/
+*.log.*
+.vs/
+.vscode/
 
 # Operating system files
 .DS_Store

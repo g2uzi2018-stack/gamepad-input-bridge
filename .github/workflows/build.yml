@@ -1,0 +1,18 @@
+name: Build and test
+on: [push, pull_request]
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S . -B build -DGAMEPAD_DEVICE=flydigi_desert_fox
+      - run: cmake --build build --config Release --parallel
+      - run: ctest --test-dir build -C Release --output-on-failure
+      - run: cmake --install build --config Release --prefix install
+  portable-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DGAMEPAD_BUILD_EXAMPLE=OFF -DGAMEPAD_SANITIZERS=ON
+      - run: cmake --build build --parallel
+      - run: ctest --test-dir build --output-on-failure
