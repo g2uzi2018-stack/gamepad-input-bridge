@@ -1,5 +1,6 @@
 #include "gamepad/gamepad.hpp"
 #include "devices/profile.hpp"
+#include "console_dashboard.hpp"
 #include <algorithm>
 #include <charconv>
 #include <csignal>
@@ -69,6 +70,8 @@ void help() {
         "  --poll-ms N             Connected polling interval (default 4)\n"
         "  --long-press-ms N       Long press threshold (default 500)\n"
         "  --analog-ms N           Analog event coalescing (default 8; 0: every change)\n"
+        "  --live                  Fixed live panel (default in an interactive terminal)\n"
+        "  --events                Print one line per event (default when redirected)\n"
         "  --json                  Print JSON Lines to stdout\n"
         "  --stats-only            Consume events without per-event printing\n"
         "  --log-file PATH         Rotating log file (parent directory must exist)\n"
@@ -82,11 +85,20 @@ int main(int argc, char** argv) {
         auto config = gamepad::example::device_configuration();
         config.log_level = gamepad::LogLevel::info;
         std::uint32_t duration = 0;
-        bool json = false, stats_only = false;
+        enum class Output { automatic, live, events, json };
+        Output output = Output::automatic;
+        bool stats_only = false;
+        auto select_output = [&](Output selected) {
+            if (output != Output::automatic && output != selected)
+                throw std::invalid_argument("Choose only one of --live, --events and --json");
+            output = selected;
+        };
         for (int i = 1; i < argc; ++i) {
             const std::string_view option(argv[i]);
             if (option == "--help") { help(); return 0; }
-            if (option == "--json") { json = true; continue; }
+            if (option == "--live") { select_output(Output::live); continue; }
+            if (option == "--events") { select_output(Output::events); continue; }
+            if (option == "--json") { select_output(Output::json); continue; }
             if (option == "--stats-only") { stats_only = true; continue; }
             if (i + 1 >= argc) throw std::invalid_argument("Missing value for " + std::string(option));
             const std::string_view value(argv[++i]);
@@ -111,16 +123,29 @@ int main(int argc, char** argv) {
         std::signal(SIGINT, on_signal);
         std::signal(SIGTERM, on_signal);
         std::cout << std::setprecision(6);
+        if (stats_only && output == Output::live)
+            throw std::invalid_argument("--live cannot be combined with --stats-only");
+        std::unique_ptr<gamepad::example::ConsoleDashboard> dashboard;
+        if (!stats_only && (output == Output::automatic || output == Output::live)) {
+            dashboard = gamepad::example::ConsoleDashboard::open(config.device_label);
+            if (!dashboard && output == Output::live)
+                throw std::runtime_error("Live view requires an interactive terminal with VT support; use --events or --json when redirecting");
+        }
+        // Worker logs must not move the dashboard cursor. File logging remains
+        // available; queue/errors are visible in the panel diagnostics fields.
+        if (dashboard) config.log_to_console = false;
         gamepad::Gamepad pad(config); // Starts its own worker; destructor joins it.
         const auto end = duration == 0 ? std::chrono::steady_clock::time_point::max()
             : std::chrono::steady_clock::now() + std::chrono::seconds(duration);
         // This lambda runs here, on main's thread, never on the capture thread.
         auto handler = [&](const gamepad::Event& event) {
-            if (!stats_only) print_event(event, json);
+            if (dashboard) dashboard->observe(event);
+            else if (!stats_only) print_event(event, output == Output::json);
         };
+        if (dashboard) dashboard->render(pad.snapshot(), pad.statistics(), true);
         while (!interrupted && std::chrono::steady_clock::now() < end) {
             gamepad::Event event;
-            auto timeout = std::chrono::milliseconds(100);
+            auto timeout = std::chrono::milliseconds(dashboard ? 33 : 100);
             if (duration != 0) {
                 timeout = std::min(timeout, std::max(std::chrono::milliseconds(0),
                     std::chrono::duration_cast<std::chrono::milliseconds>(end - std::chrono::steady_clock::now())));
@@ -130,12 +155,15 @@ int main(int argc, char** argv) {
             if (result == gamepad::WaitResult::event) {
                 handler(event);
                 pad.dispatch_pending(handler);
-                if (!stats_only) std::cout.flush();
+                if (!stats_only && !dashboard) std::cout.flush();
             }
+            if (dashboard) dashboard->render(pad.snapshot(), pad.statistics());
         }
         pad.stop(); // Optional explicit stop so we can print/drain shutdown events.
         while (pad.dispatch_pending(handler) != 0) {}
         const auto stats = pad.statistics();
+        // Restore the screen, cursor and console mode before printing summary.
+        dashboard.reset();
         std::cerr << "summary polls=" << stats.polls << " events=" << stats.produced
             << " consumed=" << stats.consumed << " dropped=" << stats.dropped
             << " high_watermark=" << stats.high_watermark

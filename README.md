@@ -31,7 +31,24 @@ Visual Studio 生成器的程序通常在 `build\bin\Release\`；Ninja 的程序
 .\build\bin\gamepad_flydigi_desert_fox.exe --slot 0 --long-press-ms 700 --poll-ms 4
 ```
 
-默认打印事件，Ctrl+C 退出。`--json` 输出 JSON Lines 到 stdout，日志和退出统计到 stderr。`--help` 查看全部参数。`--stats-only` 只消费并打印最终统计，用于减少终端输出对测量的影响。
+在交互终端中默认显示固定位置的实时面板：标签不变，仅更新变化的值，最多每秒约 30 次，不滚屏；Ctrl+C 退出并恢复原有终端画面和光标。多键同时按住显示为 `A + B`，最近一次短按/长按会保留，方便松手后查看。摇杆和扳机独立显示，扳机附带进度条。
+
+```text
+connection:   CONNECTED  slot=0
+button:       B
+dpad:        LEFT
+left stick:   X=  1200  Y=     0
+right stick:  X=     0  Y= -3200
+LT:           128/255 [######------] DOWN
+RT:             0/255 [------------]
+last action:  B SHORT PRESS (108 ms)
+press count:  short=3  long=1
+queue:        pending=0  dropped=0
+```
+
+`--events` 使用原来的逐行事件输出；`--json` 输出 JSON Lines。stdout 重定向时，默认自动使用逐行输出，不写入终端控制字符。`--live` 可显式请求实时面板，终端不支持时会提示错误。这三种输出选项互斥。
+
+实时面板模式下，模块日志不写控制台以免打乱布局；仍可通过 `--log-file capture.log` 写轮转文件，面板同时显示读取错误和队列丢弃计数。逐行/JSON 模式的日志及退出统计写 stderr。`--help` 查看全部参数，`--stats-only` 仅消费并打印最终统计。
 
 `GAMEPAD_DEVICE` 可选 `flydigi_desert_fox` 或 `generic_xinput`，分别生成 `gamepad_flydigi_desert_fox.exe` 和 `gamepad_generic_xinput.exe`。不同型号通过 `src/devices/` 中的配置选择编译目标，共用模块实现。
 
