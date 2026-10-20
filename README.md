@@ -36,7 +36,7 @@ Visual Studio 生成器的程序通常在 `build\bin\Release\`；Ninja 的程序
 ```text
 connection:   CONNECTED  slot=0
 button:       B
-dpad:        LEFT
+dpad:         LEFT
 left stick:   X=  1200  Y=     0
 right stick:  X=     0  Y= -3200
 LT:           128/255 [######------] DOWN
@@ -95,7 +95,7 @@ void example() {
 
 如果业务本身有主循环，可以只调用 `dispatch_pending(lambda)`。队列接口共用同一个消息流，不提供多消费者广播。不要在 Lambda 内销毁正在派发消息的对象。
 
-完整可运行示例：[examples/main.cpp](examples/main.cpp)。接口：[gamepad.hpp](include/gamepad/gamepad.hpp)。时序、溢出恢复和线程约定：[设计文档](docs/design.md)。
+完整可运行示例：[examples/main.cpp](examples/main.cpp)。接口：[gamepad.hpp](include/gamepad/gamepad.hpp)。完整参数、接入示例与常见排查：[使用指南](docs/user-guide.md)。时序、溢出恢复和线程约定：[设计文档](docs/design.md)。
 
 ## 手柄兼容列表
 
@@ -127,7 +127,7 @@ tests/               确定性时序测试、线程测试、微基准
 
 自动测试不依赖连接手柄，覆盖短按、长按、断连取消、重连、扳机滞回、队列并发溢出、回调异常、日志轮转和生命周期等。微基准在构建后运行 `gamepad_benchmark`。
 
-Linux 原生输入后端尚未实现。可用以下命令在 Linux 构建、测试共用逻辑：
+Linux 原生输入后端尚未实现；后续移植以 Ubuntu 为目标，暂不进行 Debian 13 / WSL USB 转发。可用以下命令在 Linux 构建、测试共用逻辑，这不代表真实手柄读取已适配：
 
 ```sh
 cmake -S . -B build -DGAMEPAD_BUILD_EXAMPLE=OFF -DCMAKE_BUILD_TYPE=Debug
