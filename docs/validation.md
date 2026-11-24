@@ -1,21 +1,42 @@
-# Windows 验证记录
+# 手柄兼容性与验证依据
 
-日期：2026-10-20。操作系统：Windows 11 专业版，10.0.26100。手柄：飞智沙漠狐，USB 无线接收器，PC XInput 模式。
+下列结果适用于 Windows 11（26100）和各节所列的连接方式。型号配置共用 PC XInput 采集后端。每个型号的控制项以实机事件为准。
 
-## 构建与自动测试
+## 飞智冰原狼 4
 
-- 工具链：便携 w64devkit 2.10.1，GCC 16.2.0，CMake 4.4.4，Ninja；工具链位于本地忽略目录，不随源码提交。
-- 固定 C++17、关闭语言扩展；Release 构建无编译告警。
-- Release 与 Debug 各运行 19 组测试，全部通过。Debug 额外开启 `-Werror -D_GLIBCXX_ASSERTIONS`。
-- 覆盖按键边沿、阈值前释放、阈值点释放、packet 不变时的长按、同时按键、初始按住、重连、断连/停止取消、扳机滞回、死区、模拟合并、元信息变化、读取错误去重、参数验证。
-- 覆盖容量为 1 的队列、满队列丢旧、出队恢复、队列关闭和排空、10 万消息的生产消费并发一致性。
-- 覆盖回调异常、回调线程归属、回调内停止、并发 stop、停止唤醒消费等待及 60 秒重连等待、100 次反复创建/析构。
-- 覆盖日志轮转、备份数量、文件大小和打开日志失败。
-- `cmake --install` 后，由独立的消费工程使用 `find_package` 和 `gamepad::input` 成功构建并运行。
-- 单独编译 `generic_xinput` 型号目标并运行，成功退出。非法槽位参数会拒绝启动。
-- GitHub Actions 的 Windows/MSVC 构建测试及 Linux 共用核心 ASan/UBSan 构建测试均实际通过：[CI 运行记录](https://github.com/g2uzi2018-stack/gamepad-input-bridge/actions/runs/39359748602)。Linux 测试使用模拟后端，不代表原生 Linux 手柄读取已实现。
+2026-11-24，Windows USB 总线报告 `Flydigi Direwolf 4`，硬件标识 `045E:028E`，驱动 `xusb22`。当时只有 XInput 槽位 0 在线。沙漠狐在同一模式下也使用 `045E:028E`，两款手柄可通过产品描述区分。
 
-## 正式 C++ 示例实机采样
+`gamepad_flydigi_direwolf_4` 以 4 ms 间隔采样 100 秒，25,002 次轮询，读取错误和丢弃均为 0。程序记录了连接以及正常退出时的断开和停止。同期直接向 XInput 读取 65 秒，12,161 次均成功，两支摇杆的四个原始坐标始终为零。此结果描述该窗口中 Windows 上报的中心值。软件沿用默认 12% 径向死区。
+
+另一次 50 秒采样捕获 54 条模拟变化事件。左摇杆 X 范围为 -3777..256，Y 为 -14400..832，径向最大推量约 45.4%，死区处理后约为 37.9%。最后一条在线状态中左摇杆原始值与有效值都回到零。12,502 次查询，读取错误和丢弃均为 0。
+
+本机中心值采样位于 `runs/2026-11-24/direwolf4-144004/`（`events.jsonl` 和 `xinput.tsv`），动作采样位于 `runs/2026-11-24/direwolf4-144153/events.jsonl`。两次统计对应 `log/2026-11-24/log_direwolf4-144004.log` 和 `log/2026-11-24/log_direwolf4-144153.log`。
+
+通用程序 `gamepad_generic_xinput` 在同一冰原狼上捕获了 A/B/X/Y、方向下、LB/RB、左右摇杆按下、两支摇杆的 X/Y 变化和 LT（0..255）。这些名称是 Windows 上报的逻辑键。同期直接读取未掩码的 XInput 按键字和同一实体设备的游戏手柄 HID 输入报告。当前 HID 输入报告长 15 字节，描述符列出 10 个按钮用途。事件、原始按键字和 HID 报文保存在 `runs/2026-11-24/direwolf4-extra-144554/`。
+
+**握把背键**。约定的动作顺序是短按 A、按住左背键约 2 秒再松手、短按 B、按住右背键约 2 秒再松手、短按 Y。通用程序、未掩码的 XInput 和同设备 HID 均捕获到 A/B/Y 的按下与松开。A 松开至 B 按下的 3.39 秒、B 松开至 Y 按下的 3.28 秒内，两路原始输入均保持基线。按该顺序，当前 USB XInput 模式与手柄配置下，项目无法把两个握把背键识别为独立输入。其他模式和厂商自定义映射需分别验证。对照数据在 `runs/2026-11-24/direwolf4-grips-144748/`。
+
+## EasySMX D15 Dune 8K
+
+2026-11-24，在 Windows 11（26100）上通过用户确认的 USB 无线接收器测试。插入后出现 USB 复合设备 `413D:2131`，HID 制造商字符串为 `EasySMX D15 Dune 8K`，产品字符串为 `Xbox 360 Controller`。`MI_00` 使用 `xusb22` 驱动，本次连接占用 XInput 槽位 0。
+
+使用 `gamepad_generic_xinput` 以 4 ms 间隔采集了 120 秒。30,002 次查询产生 2,326 条事件，全部消费，读取错误和队列丢弃均为 0。
+
+| 控制项 | 实际捕获 |
+| --- | --- |
+| 数字按键 | A、B、X、LB、RB 的按下与松开 |
+| 左摇杆 X / Y | -32768..30384 / -31872..25024 |
+| 右摇杆 X / Y | -31920..32160 / -32768..32336 |
+| 左、右扳机 | 两路分别覆盖 0..255，并触发各自的按下与松开 |
+| 按键时序 | 共 37 次短按，含扳机逻辑键 |
+
+随后用相同后端构建型号示例 `gamepad_easysmx_d15_dune_8k`，在同一接收器上连续读取 30 秒，7,503 次查询，读取错误为 0。结束时的断开事件由程序停止触发。Y、方向键、Start/Back、摇杆按下、长按和物理拔插重连仍待逐项实测。
+
+本机原始事件位于 `runs/2026-11-24/easysmx-141204/events.jsonl` 和 `runs/2026-11-24/easysmx-141327/events.jsonl`。对应统计在 `log/2026-11-24/log_easysmx_141204.log` 和 `log/2026-11-24/log_easysmx_141327.log`。
+
+## 飞智沙漠狐
+
+2026-10-20 通过 USB 无线接收器实测。USB 产品描述为 `Flydigi Dune Fox`，标识为 `045E:028E`，驱动为 `xusb22`。[设备照片](images/flydigi-desert-fox.jpg)
 
 用户在 60 秒窗口内操作手柄。程序使用系统 `XINPUT1_4.dll`，4 ms 查询、8 ms 模拟消息合并、500 ms 长按阈值、256 条队列。
 
@@ -40,6 +61,8 @@
 
 这些摇杆范围只是本次操作经过的值，不能据此评估完整量程或校准质量。未单独捕获到上下方向、左右摇杆按下，仍待实机验证。物理拔插、无线失联的表现待实测；自动测试验证的是模拟后端的断连重连行为。
 
+本机原始事件保存在 `runs/2026-10-20/flydigi-control-test/events.jsonl`，结束统计在 `log/2026-10-20/log_flydigi_control_test_stderr.log`。
+
 ## 性能测量与边界
 
 Windows 实测发现普通条件变量会使本机的查询间隔接近 15.6 ms。改用线程独立的高精度等待计时器后，3 秒测试完成 753 次查询，随后上述 60 秒测试完成 15,001 次查询，符合约 250 Hz 的配置，均无错过期限。没有调用 `timeBeginPeriod`，没有忙等。
@@ -54,6 +77,10 @@ Release 微基准的一次结果：
 ## 分发依赖
 
 MinGW Release 示例静态链接 C++/线程运行库。检查 EXE 导入依赖只有 `KERNEL32.dll`、系统 CRT `msvcrt.dll`、`XINPUT1_4.dll`，不需要附带 MinGW DLL，也不依赖旧 DirectX 的 `XINPUT1_3.dll`。
+
+## 软件验证
+
+Windows 使用便携 w64devkit 2.10.1（GCC 16.2.0、CMake 4.4.4、Ninja）构建。Release 和带 `-Werror -D_GLIBCXX_ASSERTIONS` 的 Debug 曾各通过 19 项软件测试。测试命令、覆盖行为与安装包接入验证见[测试入口](../tests/README.txt)。Windows/MSVC 以及 Linux 共用核心 ASan/UBSan 的历史构建可在 [CI 记录](https://github.com/g2uzi2018-stack/gamepad-input-bridge/actions/runs/39359748602) 中查阅。
 
 ## 相关资料
 

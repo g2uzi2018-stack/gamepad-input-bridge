@@ -1,138 +1,42 @@
 # gamepad-input-bridge
 
-C++17 手柄输入模块：对象自动管理采集线程、输入状态、按键时序、有界事件队列和日志。当前支持 Windows XInput，提供按型号编译的打印示例；后续 Linux 后端共用相同的事件与队列逻辑。
-
-## 功能
-
-- 构造时启动，析构时停止并等待线程退出；支持显式、重复及并发 `stop()`。
-- 一个有界 FIFO，支持 `try_pop`、`wait_pop` 和 `dispatch_pending(lambda)`。Lambda 在消费线程执行。
-- 队列预分配；满时丢弃最老消息。事件附序号、累计丢弃数量和完整状态，便于检测丢失和恢复当前状态。
-- 原始按键、方向键、双摇杆、双扳机；径向死区归一化、扳机滞回、可配置模拟消息合并。
-- 按下、松开、短按、长按、连接、断开、停止和读取错误事件。长按只触发一次，释放不重复触发短按。
-- Windows 高精度等待计时器，默认 4 ms 查询；断开时降低查询频率并重试。旧系统会回退普通计时器。
-- 可选文件轮转日志、限频溢出告警和运行统计。输入内容由示例打印，模块不逐条写日志。
-- 能力与可用的粗略电池信息；后端未提供的信息明确标为未知。
+在 Windows 上用 XInput 读取手柄。可以直接运行实时面板，也可以在 C++17 程序中链接 `gamepad::input`，消费按键、摇杆、扳机和连接事件。面板显示当前输入及最近一次短按或长按。Linux 目前仅支持构建和测试共用核心。
 
 ## 编译与运行
 
-需要 CMake 3.20+、C++17 编译器和 Windows SDK 或 MinGW-w64。原生 Windows 后端要求 Windows 8+；高精度计时器要求 Windows 10 1803+。
+以下命令从仓库根目录执行。需要 CMake 3.20 或以上、支持 C++17 的编译器，以及 Windows SDK（MSVC）或 MinGW-w64。Windows 原生后端使用系统的 XInput 1.4，支持 Windows 8 及以上。此机使用便携 w64devkit，工具位于 `work/toolchain/w64devkit/bin/`。
+
+在 PowerShell 中使用 Ninja 构建并启动 EasySMX 面板。若使用本机便携工具链，先执行 `$env:Path = (Resolve-Path work/toolchain/w64devkit/bin).Path + ';' + $env:Path`。
 
 ```powershell
-cmake -S . -B build -DGAMEPAD_DEVICE=flydigi_desert_fox
-cmake --build build --config Release --parallel
-ctest --test-dir build -C Release --output-on-failure
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build --target gamepad_easysmx_d15_dune_8k --parallel
+.\build\bin\gamepad_easysmx_d15_dune_8k.exe
 ```
 
-Visual Studio 生成器的程序通常在 `build\bin\Release\`；Ninja 的程序在 `build\bin\`：
+接上接收器并按键，面板应显示 `CONNECTED` 和相应的键名。默认读取槽位 0，多手柄可加 `--slot 0..3` 选择当前槽位。按 Ctrl+C 退出。用 `--events` 逐行查看事件，用 `--json` 输出 JSON Lines。
 
-```powershell
-.\build\bin\gamepad_flydigi_desert_fox.exe
-.\build\bin\gamepad_flydigi_desert_fox.exe --duration 30 --json --log-file capture.log
-.\build\bin\gamepad_flydigi_desert_fox.exe --slot 0 --long-press-ms 700 --poll-ms 4
-```
-
-在交互终端中默认显示固定位置的实时面板：标签不变，仅更新变化的值，最多每秒约 30 次，不滚屏；Ctrl+C 退出并恢复原有终端画面和光标。多键同时按住显示为 `A + B`，最近一次短按/长按会保留，方便松手后查看。摇杆和扳机独立显示，扳机附带进度条。
-
-```text
-connection:   CONNECTED  slot=0
-button:       B
-dpad:         LEFT
-left stick:   X=  1200  Y=     0
-right stick:  X=     0  Y= -3200
-LT:           128/255 [######------] DOWN
-RT:             0/255 [------------]
-last action:  B SHORT PRESS (108 ms)
-press count:  short=3  long=1
-queue:        pending=0  dropped=0
-```
-
-`--events` 使用原来的逐行事件输出；`--json` 输出 JSON Lines。stdout 重定向时，默认自动使用逐行输出，不写入终端控制字符。`--live` 可显式请求实时面板，终端不支持时会提示错误。这三种输出选项互斥。
-
-实时面板模式下，模块日志不写控制台以免打乱布局；仍可通过 `--log-file capture.log` 写轮转文件，面板同时显示读取错误和队列丢弃计数。逐行/JSON 模式的日志及退出统计写 stderr。`--help` 查看全部参数，`--stats-only` 仅消费并打印最终统计。
-
-`GAMEPAD_DEVICE` 可选 `flydigi_desert_fox` 或 `generic_xinput`，分别生成 `gamepad_flydigi_desert_fox.exe` 和 `gamepad_generic_xinput.exe`。不同型号通过 `src/devices/` 中的配置选择编译目标，共用模块实现。
-
-型号名称用于选择配置，**不是实体身份校验**。XInput 槽位不是固定设备 ID，多手柄时用 `--slot 0..3` 选择当前槽位。当前通过标准 XInput 读取，不依赖飞智空间站。
-
-## 接入自己的程序
-
-在自己的 CMake 工程中：
-
-```cmake
-add_subdirectory(path/to/gamepad-input-bridge)
-target_link_libraries(your_program PRIVATE gamepad::input)
-```
-
-作为子项目时，可先将 `GAMEPAD_BUILD_EXAMPLE` 和 `GAMEPAD_BUILD_TESTS` 设为 `OFF`，只构建库。也可 `cmake --install build --config Release --prefix install`，然后使用 `find_package(GamepadInputBridge CONFIG REQUIRED)` 与 `gamepad::input`。
-
-```cpp
-#include <gamepad/gamepad.hpp>
-#include <chrono>
-#include <iostream>
-
-void example() {
-    using namespace std::chrono_literals;
-    gamepad::Config config;
-    config.queue_capacity = 256;
-    config.long_press_threshold = 500ms;
-    gamepad::Gamepad input(config); // 自动启动
-
-    auto handle = [](const gamepad::Event& event) {
-        std::cout << gamepad::to_string(event.type) << ' '
-                  << gamepad::to_string(event.button) << '\n';
-    };
-    const auto until = std::chrono::steady_clock::now() + 10s;
-    while (std::chrono::steady_clock::now() < until) {
-        gamepad::Event event;
-        if (input.wait_pop(event, 100ms) == gamepad::WaitResult::event) {
-            handle(event);
-            input.dispatch_pending(handle); // 有上限批量消费；回调在当前线程执行
-        }
-    }
-    // 析构自动停止并 join；不需要手动管理采集线程。
-}
-```
-
-如果业务本身有主循环，可以只调用 `dispatch_pending(lambda)`。队列接口共用同一个消息流，不提供多消费者广播。不要在 Lambda 内销毁正在派发消息的对象。
-
-完整可运行示例：[examples/main.cpp](examples/main.cpp)。接口：[gamepad.hpp](include/gamepad/gamepad.hpp)。完整参数、接入示例与常见排查：[使用指南](docs/user-guide.md)。时序、溢出恢复和线程约定：[设计文档](docs/design.md)。
+同一构建目录可按目标名生成下表中的任意面板。直接执行 `cmake --build build --config Release` 会构建库、测试和默认飞智面板。`-DGAMEPAD_DEVICE=<配置名>` 选择默认构建及安装的面板。Visual Studio 生成器省略 `-G Ninja -DCMAKE_BUILD_TYPE=Release`，构建时加 `--config Release`，程序位于 `build/bin/Release/`。不同生成器各用独立目录。
 
 ## 手柄兼容列表
 
-同一型号的不同连接方式或模式分别验证。未捕获的控制项不标记通过。
+| 手柄 | CMake 配置名 | Windows 11 实机结果 |
+| --- | --- | --- |
+| EasySMX D15 Dune 8K | `easysmx_d15_dune_8k` | USB 接收器，已捕获 A/B/X、双肩键、双摇杆、独立双扳机和短按 |
+| 飞智沙漠狐 | `flydigi_desert_fox` | USB 接收器，已捕获 ABXY、左右方向、肩键、Start/Back、双摇杆、独立双扳机和短按/长按 |
+| 飞智冰原狼 4 | `flydigi_direwolf_4` | USB XInput，已捕获双摇杆 X/Y、ABXY、方向下、左右肩键、摇杆按下与 LT，背键见实测记录 |
+| 通用 XInput | `generic_xinput` | 可读取标准 XInput 槽位，具体控制项按设备和连接模式验证 |
 
-| 品牌 | 型号 | 系统 | 连接方式 | 接口 | 验证状态 | 待验证 |
-| --- | --- | --- | --- | --- | --- | --- |
-| 飞智 | 沙漠狐 | Windows 11（26100） | USB 无线接收器 | XInput 1.4 | C++ 示例已捕获 ABXY、左右方向、肩键、Start/Back、双摇杆、双扳机及短按/长按 | 上下方向、摇杆按下、物理拔插重连；Linux |
+构建目标名为 `gamepad_<配置名>`。型号配置选择默认参数，实际设备由 XInput 槽位决定。各型号的标识、轴范围和待测控制项见[实机验证](docs/validation.md)。[飞智沙漠狐参考照片](docs/images/flydigi-desert-fox.jpg)
 
-### 飞智沙漠狐
+## 项目入口
 
-![飞智沙漠狐手柄（用户提供的原图）](docs/images/flydigi-desert-fox.jpg)
+| 要做的事 | 入口 |
+| --- | --- |
+| 调整面板显示、选择输出、采样或排查断连 | [使用指南](docs/user-guide.md) · [面板与命令行](examples/main.cpp) |
+| 接入自己的 CMake/C++ 工程 | [安装与链接](docs/user-guide.md#cmake-接入) · [消费事件示例](examples/consume_events.cpp) · [公共接口](include/gamepad/gamepad.hpp) |
+| 修改型号、平台读取或按键时序 | 型号在 `src/devices/`，采集后端在 `src/backends/`，队列和事件逻辑在 `src/core/`。[线程与事件设计](docs/design.md) · [Windows 接口选择](docs/windows-input-research.md) |
+| 选择构建或运行测试 | [构建区说明原稿](cmake/build-README.txt) · [测试入口](tests/README.txt)。配置时会在 `build/README.txt` 生成一份构建说明。 |
+| 找本机采样和诊断 | JSONL 原始事件在 `runs/<日期>/<批次>/`，诊断日志在 `log/<日期>/`。默认不写文件。[采样命令](docs/user-guide.md#输出与日志) |
 
-型号名称由用户提供，图片作为设备识别参考。设备描述 `Flydigi Dune Fox`，当前模式的 VID:PID 为 `045E:028E`，使用 `xusb22` 驱动。该兼容标识不能用作型号的唯一识别条件。
-
-60 秒实机测试生成并消费 393 条事件，包含 16 次短按、2 次长按；15,001 次查询，丢弃、读取错误和错过期限均为 0。结果只代表该次测试。[测试记录](docs/validation.md)
-
-## 测试与目录
-
-```text
-include/gamepad/      公共 C++ 接口
-src/core/             事件状态机、队列、日志
-src/backends/         原生输入后端（当前 Windows XInput）
-src/platform/         平台等待/停止机制
-src/devices/          型号编译配置
-examples/main.cpp    Lambda 消费并打印事件的示例
-tests/               确定性时序测试、线程测试、微基准
-```
-
-自动测试不依赖连接手柄，覆盖短按、长按、断连取消、重连、扳机滞回、队列并发溢出、回调异常、日志轮转和生命周期等。微基准在构建后运行 `gamepad_benchmark`。
-
-Linux 原生输入后端尚未实现；后续移植以 Ubuntu 为目标，暂不进行 Debian 13 / WSL USB 转发。可用以下命令在 Linux 构建、测试共用逻辑，这不代表真实手柄读取已适配：
-
-```sh
-cmake -S . -B build -DGAMEPAD_BUILD_EXAMPLE=OFF -DCMAKE_BUILD_TYPE=Debug
-cmake --build build --parallel
-ctest --test-dir build --output-on-failure
-```
-
-[Windows 接口调研](docs/windows-input-research.md)记录了 XInput/HID/Switch 的区别及初始检测过程。
+运行时参数由 C++ 的 `Config` 或面板命令行传入。库构造时启动采集，析构或显式 `stop()` 时停止。事件队列满时丢弃最老消息，消费者可用事件序号、丢弃计数和完整状态恢复当前输入。

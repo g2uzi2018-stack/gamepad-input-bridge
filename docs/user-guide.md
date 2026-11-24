@@ -2,17 +2,19 @@
 
 ## 当前支持范围
 
-原生采集支持 Windows XInput 1.4。飞智沙漠狐在 USB 接收器的 PC 模式下已完成部分实机验证，详细控制项见 [兼容列表](../README.md#手柄兼容列表)。型号编译配置不等于硬件身份校验；同一只手柄切换到 Switch 或其他模式后，需要重新适配和验证。
+原生采集支持 Windows XInput 1.4。项目提供飞智沙漠狐、飞智冰原狼 4 和 EasySMX D15 Dune 8K 的面板。各型号实测的连接方式和控制项见[兼容列表](../README.md#手柄兼容列表)。切换连接方式或输入模式后，需要单独验证。
 
-Linux 原生后端尚未实现。后续移植以 Ubuntu 为目标，暂不进行 Debian 13 或 WSL USB 转发测试。现有 Linux CI 仅验证共用核心，不能据此认定 Linux 手柄输入已受支持。
+Linux 构建覆盖共用核心，原生手柄输入目前仅在 Windows 提供。
 
 ## 启动示例程序
 
-以下命令在仓库根目录执行，使用 Ninja 构建后的路径。Visual Studio 构建时在 `bin` 后增加 `Release` 目录；运行包中的程序在 `bin` 目录。
+从仓库根目录完成[编译](../README.md#编译与运行)后，在交互 PowerShell 中启动所选型号。以下为 Ninja 的路径，Visual Studio 的 Release 程序在 `build/bin/Release/`。
 
 ```powershell
-.\build\bin\gamepad_flydigi_desert_fox.exe
+.\build\bin\gamepad_easysmx_d15_dune_8k.exe
 ```
+
+飞智冰原狼 4 对应 `gamepad_flydigi_direwolf_4.exe`，飞智沙漠狐对应 `gamepad_flydigi_desert_fox.exe`，通用面板为 `gamepad_generic_xinput.exe`。这些目标可在同一构建目录按名生成。
 
 交互终端默认显示固定面板，左侧标签固定，右侧值变化时原位更新。多个键显示为 `A + B`；最近一次短按或长按会保留，便于松手后查看。左右摇杆显示原始 X/Y 数值，左右扳机分别显示数值和进度条。
 
@@ -29,15 +31,23 @@ Linux 原生后端尚未实现。后续移植以 Ubuntu 为目标，暂不进行
 | JSON Lines 数据输出 | `--json` |
 | 自动运行 30 秒后退出 | `--duration 30` |
 | 只消费并显示退出统计 | `--stats-only` |
-| 写轮转日志 | `--log-file capture.log` |
+| 写轮转日志 | `--log-file <日志路径>`（父目录须已存在） |
 | 查看完整参数 | `--help` |
 
 `--live`、`--events`、`--json` 互斥。输出重定向到文件时，默认自动使用逐行模式，不写光标控制字符；显式 `--live` 遇到不支持的终端会报错。`--live` 不能与 `--stats-only` 组合。
 
-记录 30 秒 JSON 输入，并单独保存诊断输出：
+从仓库根目录在 PowerShell 中记录 30 秒 EasySMX 输入。批次名含开始时间，重复采集时保留各次事件，stderr 中的日志和结束统计归入当天的日志目录。
 
 ```powershell
-.\build\bin\gamepad_flydigi_desert_fox.exe --json --duration 30 --log-file capture.log > events.jsonl 2> diagnostics.log
+$start = Get-Date
+$day = $start.ToString('yyyy-MM-dd')
+$batch = 'easysmx-' + $start.ToString('HHmmss-fff')
+$run = "runs/$day/$batch"
+$logs = "log/$day"
+New-Item -ItemType Directory -Path $run -ErrorAction Stop | Out-Null
+New-Item -ItemType Directory -Force -Path $logs | Out-Null
+Start-Process .\build\bin\gamepad_easysmx_d15_dune_8k.exe -ArgumentList '--json','--duration','30' -NoNewWindow -Wait `
+    -RedirectStandardOutput "$run/events.jsonl" -RedirectStandardError "$logs/log_${batch}.log"
 ```
 
 实时面板禁止模块日志输出到控制台，以免打乱布局；文件日志仍可用。面板的 `diagnostics` 显示读取错误次数、最近错误码和错过轮询期限次数，`queue` 显示队列深度与丢弃数量。逐行/JSON 模式下，日志与退出统计写 stderr，输入数据写 stdout。
@@ -75,59 +85,7 @@ target_link_libraries(my_app PRIVATE gamepad::input)
 
 ## 一个完整的 C++ 消费示例
 
-以下程序运行 10 秒。构造对象自动启动线程，Lambda 在调用它的 main 线程执行；`stop()` 后排空队列，析构会再次安全地确认停止。
-
-```cpp
-#include <gamepad/gamepad.hpp>
-#include <chrono>
-#include <cstdint>
-#include <exception>
-#include <iostream>
-
-int main() {
-    using namespace std::chrono_literals;
-    try {
-        gamepad::Config config;
-        config.slot = 0;
-        config.queue_capacity = 256;
-        config.poll_interval = 4ms;
-        config.long_press_threshold = 500ms;
-        gamepad::Gamepad input(config);
-
-        std::uint64_t last_sequence = 0;
-        std::uint64_t last_dropped = 0;
-        auto handle = [&](const gamepad::Event& event) {
-            const bool gap = event.sequence != last_sequence + 1;
-            if (gap || event.dropped_total != last_dropped) {
-                // 业务此时应根据 event.state 恢复状态，放弃旧的边沿推断。
-                std::cerr << "Input gap; current A="
-                          << event.state.pressed(gamepad::Button::a) << '\n';
-            }
-            last_sequence = event.sequence;
-            last_dropped = event.dropped_total;
-            std::cout << gamepad::to_string(event.type) << ' '
-                      << gamepad::to_string(event.button) << '\n';
-        };
-
-        const auto end = std::chrono::steady_clock::now() + 10s;
-        while (std::chrono::steady_clock::now() < end) {
-            gamepad::Event event;
-            const auto result = input.wait_pop(event, 100ms);
-            if (result == gamepad::WaitResult::stopped) break;
-            if (result == gamepad::WaitResult::event) {
-                handle(event);
-                input.dispatch_pending(handle, 64);
-            }
-        }
-        input.stop();
-        while (input.dispatch_pending(handle, 64) != 0) {}
-        return 0;
-    } catch (const std::exception& error) {
-        std::cerr << error.what() << '\n';
-        return 1;
-    }
-}
-```
+[完整的消费示例](../examples/consume_events.cpp)连续读取 10 秒，在 main 线程执行回调，遇到丢弃时读取事件携带的状态，停止后排空队列。
 
 已有业务主循环时，可以只调用 `dispatch_pending(lambda, max_count)`。它不阻塞，每次最多处理指定数量；`try_pop` 则每次尝试取一条。`wait_pop` 可等待消息、超时或队列停止，负超时会抛异常。
 
