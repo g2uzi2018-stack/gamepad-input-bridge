@@ -62,9 +62,12 @@ void print_event(const gamepad::Event& event, bool json) {
     }
 }
 void help() {
-    std::cout << "Gamepad input bridge (C++17 / Windows XInput)\n"
+    std::cout << "Gamepad input bridge (C++17)\n"
         "Usage: gamepad_<device> [options]\n"
-        "  --slot 0..3             XInput slot (default 0; not a permanent device ID)\n"
+        "  --slot 0..3             Gamepad slot (default 0; not a permanent device ID)\n"
+#ifdef __linux__
+        "  --device-path PATH      Open this evdev event node instead of the numbered slot\n"
+#endif
         "  --duration SECONDS      Stop automatically (default 0: until Ctrl+C)\n"
         "  --queue-capacity N      Bounded FIFO capacity (default 256)\n"
         "  --poll-ms N             Connected polling interval (default 4)\n"
@@ -103,6 +106,9 @@ int main(int argc, char** argv) {
             if (i + 1 >= argc) throw std::invalid_argument("Missing value for " + std::string(option));
             const std::string_view value(argv[++i]);
             if (option == "--slot") config.slot = number(value);
+#ifdef __linux__
+            else if (option == "--device-path") config.linux_event_path = value;
+#endif
             else if (option == "--duration") {
                 duration = number(value);
                 if (duration > 86400) throw std::invalid_argument("duration must be <= 86400 seconds");

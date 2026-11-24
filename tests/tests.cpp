@@ -2,6 +2,12 @@
 #include "core/event_engine.hpp"
 #include "core/event_queue.hpp"
 #include "core/logger.hpp"
+#ifdef __linux__
+#include "backends/linux_evdev_slot.hpp"
+#include <cerrno>
+#include <cstdlib>
+#include <unistd.h>
+#endif
 #include <atomic>
 #include <cmath>
 #include <filesystem>
@@ -25,6 +31,40 @@ template<class F> void expect_invalid(F&& f) {
     try { f(); } catch (const std::invalid_argument&) { threw = true; }
     CHECK(threw);
 }
+#ifdef __linux__
+void linux_numbered_hotplug() {
+    namespace fs = std::filesystem;
+    char temp[] = "/tmp/gamepad-slots-XXXXXX";
+    CHECK(::mkdtemp(temp) != nullptr);
+    const fs::path root(temp);
+    const auto sys = root / "sys", dev = root / "dev";
+    auto probe = [&](unsigned slot) {
+        int fd = -1;
+        const int error = open_linux_slot(sys.c_str(), dev.c_str(), slot, fd);
+        if (error == ENODEV || error == ENOENT) return -1;
+        CHECK(error == 0);
+        char byte{};
+        const auto n = ::read(fd, &byte, 1);
+        ::close(fd);
+        CHECK(n >= 0);
+        return static_cast<int>(n); // /dev/null returns EOF, /dev/zero supplies one byte.
+    };
+    try {
+        fs::create_directory(dev);
+        fs::create_symlink("/dev/null", dev / "event8");
+        fs::create_symlink("/dev/zero", dev / "event7");
+        fs::create_directories(sys / "js0/device/event8");
+        CHECK(probe(0) == 0 && probe(1) == -1);
+        fs::create_directories(sys / "js1/device/event7");
+        CHECK(probe(0) == 0 && probe(1) == 1);
+        fs::remove_all(sys / "js0");
+        CHECK(probe(0) == -1 && probe(1) == 1);
+        fs::create_directories(sys / "js0/device/event8");
+        CHECK(probe(0) == 0 && probe(1) == 1);
+    } catch (...) { fs::remove_all(root); throw; }
+    fs::remove_all(root);
+}
+#endif
 template<class F> void eventually(F&& predicate) {
     const auto end = std::chrono::steady_clock::now() + 2s;
     while (!predicate()) {
@@ -369,6 +409,9 @@ int main() {
         {"queue overflow recovery and draining", queue_overflow_and_close},
         {"concurrent queue overwrite consistency", queue_wait_and_concurrent_overwrite},
         {"configuration validation", config_validation},
+#ifdef __linux__
+        {"Linux numbered slots survive hotplug", linux_numbered_hotplug},
+#endif
         {"thread lifecycle callback exceptions concurrent stop", threaded_lifecycle_and_callback_exception},
         {"stop wakes reconnect and consumer waits", stop_interrupts_reconnect_wait_and_waiter},
         {"threaded hotplug and bounded dispatch", threaded_hotplug_and_dispatch_limit},

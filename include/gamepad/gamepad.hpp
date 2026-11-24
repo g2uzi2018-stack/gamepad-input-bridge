@@ -92,6 +92,8 @@ struct Config {
     std::string log_file; // Empty disables file logging. Parent must already exist.
     std::size_t log_max_bytes = 1024 * 1024;
     std::size_t log_backups = 2;
+    // Linux only: select an evdev event node directly instead of the kernel jsN slot.
+    std::string linux_event_path;
 };
 
 struct Statistics {

@@ -14,6 +14,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: cmake -S . -B build/linux-core -DCMAKE_BUILD_TYPE=Debug -DGAMEPAD_BUILD_EXAMPLE=OFF -DGAMEPAD_SANITIZERS=ON
+      - run: cmake -S . -B build/linux-core -DCMAKE_BUILD_TYPE=Debug -DGAMEPAD_DEVICE=easysmx_d15_dune_8k -DGAMEPAD_SANITIZERS=ON
       - run: cmake --build build/linux-core --parallel
       - run: ctest --test-dir build/linux-core --output-on-failure

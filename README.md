@@ -1,10 +1,20 @@
 # gamepad-input-bridge
 
-在 Windows 上用 XInput 读取手柄。可以直接运行实时面板，也可以在 C++17 程序中链接 `gamepad::input`，消费按键、摇杆、扳机和连接事件。面板显示当前输入及最近一次短按或长按。Linux 目前仅支持构建和测试共用核心。
+在 Windows 上通过 XInput、在 Linux 上通过 evdev 读取手柄。可以直接运行实时面板，也可以在 C++17 程序中链接 `gamepad::input`，消费按键、摇杆、扳机和连接事件。
 
 ## 编译与运行
 
-以下命令从仓库根目录执行。需要 CMake 3.20 或以上、支持 C++17 的编译器，以及 Windows SDK（MSVC）或 MinGW-w64。Windows 原生后端使用系统的 XInput 1.4，支持 Windows 8 及以上。此机使用便携 w64devkit，工具位于 `work/toolchain/w64devkit/bin/`。
+Jetson / Linux 使用支持 C++17 的编译器和 Linux 输入头文件。从项目根目录构建 EasySMX 示例：
+
+```sh
+cmake -S . -B build/linux -DCMAKE_BUILD_TYPE=Release -DGAMEPAD_DEVICE=easysmx_d15_dune_8k
+cmake --build build/linux --parallel
+build/linux/bin/gamepad_easysmx_d15_dune_8k --events
+```
+
+EasySMX 接收器在 Jetson 上需要驱动创建游戏手柄设备节点。已安装的程序路径、驱动来源和撤回方式见 [Jetson 接入说明](docs/jetson-easysmx.md)。
+
+Windows 构建需要 CMake 3.20 或以上、支持 C++17 的编译器，以及 Windows SDK（MSVC）或 MinGW-w64。Windows 原生后端使用系统的 XInput 1.4，支持 Windows 8 及以上。此机使用便携 w64devkit，工具位于 `work/toolchain/w64devkit/bin/`。
 
 在 PowerShell 中使用 Ninja 构建并启动 EasySMX 面板。若使用本机便携工具链，先执行 `$env:Path = (Resolve-Path work/toolchain/w64devkit/bin).Path + ';' + $env:Path`。
 
@@ -27,7 +37,7 @@ cmake --build build --target gamepad_easysmx_d15_dune_8k --parallel
 | 飞智冰原狼 4 | `flydigi_direwolf_4` | USB XInput，已捕获双摇杆 X/Y、ABXY、方向下、左右肩键、摇杆按下与 LT，背键见实测记录 |
 | 通用 XInput | `generic_xinput` | 可读取标准 XInput 槽位，具体控制项按设备和连接模式验证 |
 
-构建目标名为 `gamepad_<配置名>`。型号配置选择默认参数，实际设备由 XInput 槽位决定。各型号的标识、轴范围和待测控制项见[实机验证](docs/validation.md)。[飞智沙漠狐参考照片](docs/images/flydigi-desert-fox.jpg)
+构建目标名为 `gamepad_<配置名>`。型号配置选择默认参数，实际设备由所选平台的槽位决定。Jetson 已实测 EasySMX USB 接收器。各型号的标识、轴范围和待测控制项见[实机验证](docs/validation.md)。[飞智沙漠狐参考照片](docs/images/flydigi-desert-fox.jpg)
 
 ## 项目入口
 

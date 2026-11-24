@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=EasySMX Gamepad Test
+Name[zh_CN]=EasySMX 手柄测试
+Name[zh_TW]=EasySMX 手把測試
+Exec=gnome-terminal --window --title="EasySMX - Jetson Linux" --geometry=88x23 -- /opt/gamepad-input-bridge/bin/gamepad_easysmx_d15_dune_8k --live
+TryExec=/opt/gamepad-input-bridge/bin/gamepad_easysmx_d15_dune_8k
+Terminal=false
+Icon=input-gaming
+Categories=Utility;
+Keywords=Gamepad;Joystick;Controller;

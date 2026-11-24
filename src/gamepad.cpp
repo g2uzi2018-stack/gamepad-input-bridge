@@ -14,7 +14,7 @@
 namespace gamepad {
 namespace {
 Config validate(Config config) {
-    if (config.slot > 3) throw std::invalid_argument("XInput slot must be 0..3");
+    if (config.slot > 3) throw std::invalid_argument("Gamepad slot must be 0..3");
     if (config.queue_capacity == 0 || config.queue_capacity > 1048576)
         throw std::invalid_argument("queue_capacity must be 1..1048576");
     if (config.poll_interval < std::chrono::microseconds(1000) ||

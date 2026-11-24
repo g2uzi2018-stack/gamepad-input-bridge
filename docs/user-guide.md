@@ -2,9 +2,9 @@
 
 ## 当前支持范围
 
-原生采集支持 Windows XInput 1.4。项目提供飞智沙漠狐、飞智冰原狼 4 和 EasySMX D15 Dune 8K 的面板。各型号实测的连接方式和控制项见[兼容列表](../README.md#手柄兼容列表)。切换连接方式或输入模式后，需要单独验证。
+Windows 原生采集使用 XInput 1.4。项目提供飞智沙漠狐、飞智冰原狼 4 和 EasySMX D15 Dune 8K 的面板。各型号实测的连接方式和控制项见[兼容列表](../README.md#手柄兼容列表)。切换连接方式或输入模式后，需要单独验证。
 
-Linux 构建覆盖共用核心，原生手柄输入目前仅在 Windows 提供。
+Linux 通过 evdev 读取采用标准 Xbox 布局的游戏手柄节点。Jetson 上已测试 EasySMX D15 Dune 8K 的 USB 接收器，拥有该游戏手柄 event 节点读取权限的账号可运行同一 C++ 事件接口。[Jetson 接入说明](jetson-easysmx.md)
 
 ## 启动示例程序
 
@@ -58,7 +58,8 @@ Start-Process .\build\bin\gamepad_easysmx_d15_dune_8k.exe -ArgumentList '--json'
 
 | 选项 | 默认值 | 有效范围或说明 |
 | --- | --- | --- |
-| `--slot` | 0 | 0..3；当前 XInput 槽位，不是永久设备 ID |
+| `--slot` | 0 | Windows XInput 或 Linux 内核 js0..js3 的编号 |
+| `--device-path` | 空 | Linux 专用，对应 Config::linux_event_path。直接选择可读的 evdev 节点，优先于槽位；适用于没有 joydev、其他槽位被占用或需要固定 USB 端口的情况 |
 | `--queue-capacity` | 256 | 1..1048576 条消息 |
 | `--poll-ms` | 4 | 1..1000 ms；连接时的目标查询间隔 |
 | `--long-press-ms` | 500 | 1..3600000 ms；达到阈值触发一次长按 |
@@ -96,7 +97,7 @@ target_link_libraries(my_app PRIVATE gamepad::input)
 | 字段 | 默认值 | 含义与限制 |
 | --- | --- | --- |
 | `device_label` | `generic_xinput` | 日志标签，不用于识别硬件 |
-| `slot` | 0 | 当前 XInput 槽位，0..3 |
+| `slot` | 0 | 当前平台的手柄槽位，0..3 |
 | `queue_capacity` | 256 | 固定容量，满时丢最老消息 |
 | `poll_interval` | 4000 us | 连接时轮询间隔，1 ms..1 s |
 | `reconnect_interval` | 1000 ms | 未连接或读取失败后的重试间隔，10 ms..1 min |
@@ -130,9 +131,9 @@ target_link_libraries(my_app PRIVATE gamepad::input)
 
 | 现象 | 检查方式 |
 | --- | --- |
-| 一直显示断开 | 确认手柄开机、接收器连接和 PC/XInput 模式；多手柄时检查 `--slot` |
+| 一直显示断开或错误 13 | Windows 检查 PC/XInput 模式和槽位。Linux 检查 USB 接口驱动、游戏手柄节点和当前用户的读权限。可用 `--device-path /dev/input/by-path/…-event-joystick` 选择具体设备 |
 | 接收器显示连接，但按键一直为 0 | 连接状态本身不足以证明无线链路正常；操作实体按键确认值会变化 |
-| 面板不能打开 | 直接在交互 PowerShell / Windows Terminal 运行；重定向时使用 `--events` 或 `--json` |
+| 面板不能打开 | 在 Windows 或 Linux 的交互终端运行；重定向时使用 `--events` 或 `--json` |
 | 面板按键松开后变成 `-` | `button` 表示当前按住状态，已完成的短按/长按看 `last action` |
 | 操作变慢或队列丢弃增加 | 检查业务回调耗时，及时消费；按需要增加容量或合并模拟消息 |
 | 电池显示未知或设备被报告为有线 | 接收器可能不暴露电池信息，不能据此判断实体手柄电量 |

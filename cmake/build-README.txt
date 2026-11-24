@@ -21,8 +21,13 @@ build/debug/  Windows 单配置生成器的调试构建
   本机 MinGW 调试配置另外使用 -DCMAKE_CXX_FLAGS="-Werror -D_GLIBCXX_ASSERTIONS"。
   Visual Studio 可直接在 build/ 使用 --config Debug。
 
-build/linux-core/  Linux 共用核心
-  编译 src/core/、非 Windows 平台代码和测试。此配置关闭 Windows 面板。
+build/linux/  Linux 手柄采集（evdev）
+  cmake -S . -B build/linux -DCMAKE_BUILD_TYPE=Release -DGAMEPAD_DEVICE=easysmx_d15_dune_8k
+  cmake --build build/linux --parallel
+  build/linux/bin/gamepad_easysmx_d15_dune_8k --events
+
+build/linux-core/  Linux 共用核心测试
+  此配置关闭示例，保留库和测试。
   cmake -S . -B build/linux-core -DCMAKE_BUILD_TYPE=Debug -DGAMEPAD_BUILD_EXAMPLE=OFF
   cmake --build build/linux-core --parallel
   ctest --test-dir build/linux-core --output-on-failure
