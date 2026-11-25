@@ -71,3 +71,7 @@ rm -f "$HOME/.local/share/applications/gamepad-easysmx-test.desktop"
 ```
 
 这次部署的 C++ 程序及开发库位于独立目录 `/opt/gamepad-input-bridge/`。该目录和上述 `/usr/local/src/` 下的驱动源码可单独移除。
+
+## Linux 手柄振动
+
+本机模块使用同一份上游 xpad 源码的 CONFIG_JOYSTICK_XPAD_FF 分支，依赖内核 ff-memless。读取节点在 sysfs 的 capabilities/ff 应声明 FF_RUMBLE。库提供 gamepad/evdev_rumble.hpp，使用 gamepad::EvdevRumble(持久 event 路径)，调用 pulse(strong, weak, duration)。两路幅度为 0–65535，单次时长 1–1000 ms；成功表示内核接受上传和播放，设备端到时停止。接收器重新枚举后按路径重开。旧输入专用模块会返回不支持，采集仍可用。

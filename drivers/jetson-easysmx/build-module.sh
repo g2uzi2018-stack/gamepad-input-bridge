@@ -1,5 +1,5 @@
 #!/bin/sh
-# Build the input-only EasySMX module in a new directory on the Jetson.
+# Build the EasySMX input and rumble module in a new directory on the Jetson.
 set -eu
 if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
     echo "Usage: sh build-module.sh NEW_BUILD_DIRECTORY [upstream-xpad.c]" >&2
@@ -33,7 +33,7 @@ static const struct usb_device_id xpad_table[] = {\
     -e 's/abs, -32768, 32767, 16, 128);/abs, -32768, 32767, 0, 128);\
 		if (abs == ABS_Y || abs == ABS_RY)\
 			input_abs_set_val(input_dev, abs, -1);/' xpad.c.orig > xpad_easysmx.c
-printf '%s\n' 'obj-m := xpad_easysmx.o' > Makefile
+printf '%s\n' 'obj-m := xpad_easysmx.o' 'ccflags-y += -DCONFIG_JOYSTICK_XPAD_FF=1' > Makefile
 make -C "$headers" M="$build_dir" modules
 test "$(modinfo -F vermagic ./xpad_easysmx.ko)" = "$(modinfo -F vermagic joydev)" || fail "Module ABI differs from installed joydev"
 test "$(modinfo -F alias ./xpad_easysmx.ko)" = 'usb:v413Dp2131d*dc*dsc*dp*icFFisc5Dip01in*' || fail "Unexpected USB module alias"

@@ -50,3 +50,5 @@ cmake --build build --target gamepad_easysmx_d15_dune_8k --parallel
 | 找本机采样和诊断 | JSONL 原始事件在 `runs/<日期>/<批次>/`，诊断日志在 `log/<日期>/`。默认不写文件。[采样命令](docs/user-guide.md#输出与日志) |
 
 运行时参数由 C++ 的 `Config` 或面板命令行传入。库构造时启动采集，析构或显式 `stop()` 时停止。事件队列满时丢弃最老消息，消费者可用事件序号、丢弃计数和完整状态恢复当前输入。
+
+Linux 消费者可用 `gamepad::EvdevRumble` 通过同一接收器的 event 路径请求硬件定时脉冲。见[Jetson 接入说明](docs/jetson-easysmx.md)。
