@@ -99,3 +99,5 @@ Windows 使用便携 w64devkit 2.10.1（GCC 16.2.0、CMake 4.4.4、Ninja）构�
 - [微软 XInputGetState](https://learn.microsoft.com/en-us/windows/win32/api/xinput/nf-xinput-xinputgetstate)
 - [微软高精度等待计时器](https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-createwaitabletimerexw)
 - [接口与线程设计](design.md)
+
+2026-11-25，EasySMX D15 Dune 8K 接入 Jetson，Linux 5.15.148-rt-tegra。通过本机安装的 1.1.1 公共头文件和静态库，从持久 event 路径依次请求 300、100、70、160 ms 的预设，四次调用的错误码均为 0。该记录验证 EV_FF 上传和播放请求被内核受理，时长为请求值。

@@ -75,3 +75,12 @@ rm -f "$HOME/.local/share/applications/gamepad-easysmx-test.desktop"
 ## Linux 手柄振动
 
 本机模块使用同一份上游 xpad 源码的 CONFIG_JOYSTICK_XPAD_FF 分支，依赖内核 ff-memless。读取节点在 sysfs 的 capabilities/ff 应声明 FF_RUMBLE。库提供 gamepad/evdev_rumble.hpp，使用 gamepad::EvdevRumble(持久 event 路径)，调用 pulse(strong, weak, duration)。两路幅度为 0–65535，单次时长 1–1000 ms；成功表示内核接受上传和播放，设备端到时停止。接收器重新枚举后按路径重开。旧输入专用模块会返回不支持，采集仍可用。
+
+使用预设时，开启、关闭、换档、触限可分别选用长确认 300 ms、短确认 100 ms、轻提示 70 ms、边界提示 160 ms。每次调用播放一次，调用者决定哪一次状态变化触发提示。
+
+```cpp
+gamepad::EvdevRumble feedback(event_path);
+auto error = feedback.pulse(gamepad::rumble::long_confirmation);
+```
+
+其余预设为 `gamepad::rumble::short_confirmation`、`gamepad::rumble::step`、`gamepad::rumble::limit`。调用方可检查返回的 `std::error_code` 判断内核是否受理。

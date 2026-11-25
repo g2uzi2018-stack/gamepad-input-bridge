@@ -6,6 +6,20 @@
 #include <system_error>
 
 namespace gamepad {
+struct RumblePulse {
+    std::uint16_t strong;
+    std::uint16_t weak;
+    std::chrono::milliseconds duration;
+};
+
+// 单次设备定时脉冲，调用方可沿用预设，也可独立设置两路马达。
+namespace rumble {
+inline constexpr RumblePulse long_confirmation{52428, 26214, std::chrono::milliseconds{300}};
+inline constexpr RumblePulse short_confirmation{47185, 23592, std::chrono::milliseconds{100}};
+inline constexpr RumblePulse step{42598, 21299, std::chrono::milliseconds{70}};
+inline constexpr RumblePulse limit{36044, 18022, std::chrono::milliseconds{160}};
+} // namespace rumble
+
 // Linux EV_FF output on the same persistent event path as the input reader.
 // Device-timed pulse. Closing the object removes all effects owned by this fd.
 class EvdevRumble final {
@@ -16,6 +30,9 @@ public:
     EvdevRumble& operator=(const EvdevRumble&) = delete;
     std::error_code pulse(std::uint16_t strong, std::uint16_t weak,
                           std::chrono::milliseconds duration);
+    std::error_code pulse(RumblePulse feedback) {
+        return pulse(feedback.strong, feedback.weak, feedback.duration);
+    }
 private:
     void close_device();
     std::string path_;
