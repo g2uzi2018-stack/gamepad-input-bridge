@@ -14,7 +14,7 @@ struct RumblePulse {
 
 // 单次设备定时脉冲，调用方可沿用预设，也可独立设置两路马达。
 namespace rumble {
-inline constexpr RumblePulse long_confirmation{65535, 65535, std::chrono::milliseconds{700}};
+inline constexpr RumblePulse long_confirmation{65535, 65535, std::chrono::milliseconds{500}};
 inline constexpr RumblePulse short_confirmation{52428, 39321, std::chrono::milliseconds{130}};
 inline constexpr RumblePulse step{42598, 29491, std::chrono::milliseconds{90}};
 inline constexpr RumblePulse limit{36044, 18022, std::chrono::milliseconds{160}};
